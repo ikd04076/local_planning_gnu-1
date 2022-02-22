@@ -31,7 +31,7 @@ class ODGPF:
         self.GRAVITY_ACC = rospy.get_param('g', 9.81)
         self.SPEED_MAX = rospy.get_param('max_speed', 20.0)
         self.SPEED_MIN = rospy.get_param('min_speed', 1.5)
-        self.RATE = rospy.get_param('rate', 300)
+        self.RATE = rospy.get_param('rate', 100)
         self.ROBOT_SCALE = rospy.get_param('robot_scale', 0.25)
         self.ROBOT_LENGTH = rospy.get_param('robot_length', 0.325)
         self.LOOK = 5
@@ -42,7 +42,7 @@ class ODGPF:
 
         self.logging_dic_path = rospy.get_param("data_path")
 
-        self.waypoint_real_path = rospy.get_param('wpt_path', '../map/wp_vegas.csv')
+        self.waypoint_real_path = rospy.get_param('wpt_path', '../map/wp_sprint.csv')
         self.waypoint_delimeter = rospy.get_param('wpt_delimeter', ',')
 
 
@@ -56,10 +56,7 @@ class ODGPF:
         self.min_idx = 0
         self.f_rep_past_list =[0]*1080
         self.t_start = time.time()
-        #self.p = 0.1
-        self.w = 0.9
-        self.d = 0.05
-        self.i = 0.5
+
         self.steering_min = 5
         self.steering_max = 15
 
@@ -77,11 +74,10 @@ class ODGPF:
 
         self.current_position = [0,0,0]
         self.interval = 0.00435
-        self.gamma = 0.5
+        self.gamma = 0.4
         #self.a_k = 1.2
         self.current_speed = 1.0
         self.set_speed = 0.0
-        self.alpha = 0.9
 
         self.ackermann_data.drive.acceleration = 0
         self.ackermann_data.drive.jerk = 0
@@ -105,48 +101,91 @@ class ODGPF:
         self.recording = open('/home/lab/f1tenth_ws/src/local_planning_gnu/utill/recording.csv', 'a')
 
         # Trajectory Logging
-        self.logger_trigger = rospy.get_param('logging', False)
-        self.logger_init()
+        self.traj_trigger = rospy.get_param('traj_logging', True)
+        self.exec_trigger = rospy.get_param('exec_logging', True)
+        # self.logger_init()
+        self.exec_logger_init()
+        self.traj_logger_init()
 
         self.logging_idx = 0
         self.race_time = 0
 
 
-    def logger_init(self):
-        if self.logger_trigger:
-            
+    def exec_logger_init(self):
+        if self.exec_trigger:
+            time_name = "ODGGNU_DEBUG_DATA"
             interval = 0
 
-            time_name = "ODGGNU_TIME_DATA"
-            trajectory_name = "ODGGNU_TRAJECTORY_DATA"
-
             while True:
-                self.time_data_file_name = f"{time_name}_{interval}.csv"
-                self.traj_data_file_name = f"{trajectory_name}_{interval}.csv"
-
-                self.time_data_file = f"{self.logging_dic_path}/{self.time_data_file_name}"
-                self.traj_data_file = f"{self.logging_dic_path}/{self.traj_data_file_name}"
-
-                time_file_check = os.path.isfile(self.time_data_file)
-                traj_file_check = os.path.isfile(self.traj_data_file)
-
-                if time_file_check == False and traj_file_check == False:
-                    break
-                else:
+                time_data_file_name = f"{self.logging_dic_path}/debug_data/{time_name}_{interval}.csv"
+                if os.path.isfile(time_data_file_name):
                     interval += 1
-
-            print(f"Execution Time Data Path: {self.time_data_file_name}")
-            print(f"Trajectoy Data Path: {self.time_data_file_name}")
-           
-            self.time_data = open(self.time_data_file, "w", newline="")
-
+                else:
+                    break
+            
+            self.time_data = open(time_data_file_name, "w", newline="")
             self.time_data_writer = csv.writer(self.time_data)
-            self.time_data_writer.writerow(["index","time","exe_time"])
+            self.time_data_writer.writerow(["index","time","exec_time","obs_count"])
+        else:
+            pass
 
-            self.trajectory = open(self.traj_data_file,'w')
+
+    def traj_logger_init(self):
+
+        if self.traj_trigger:
+           traj_name = "ODGGNU_TRAJ_DATA"
+           interval = 0
+
+           while True:
+                traj_data_file_name = f"{self.logging_dic_path}/traj_data/{traj_name}_{interval}.csv"
+                if os.path.isfile(traj_data_file_name):
+                    interval += 1
+                else:
+                    break
+        
+
+           self.traj_data = open(traj_data_file_name, "w", newline="")
+           self.traj_data_writer = csv.writer(self.traj_data)
 
         else:
             pass
+
+    # def logger_init(self):
+    #     if self.logger_trigger:
+            
+    #         interval = 0
+
+    #         time_name = "ODGGNU_TIME_DATA"
+    #         trajectory_name = "ODGGNU_TRAJECTORY_DATA"
+
+    #         while True:
+    #             self.time_data_file_name = f"{time_name}_{interval}.csv"
+    #             self.traj_data_file_name = f"{trajectory_name}_{interval}.csv"
+
+
+    #             self.time_data_file = f"{self.logging_dic_path}/debug_data/{self.time_data_file_name}"
+    #             self.traj_data_file = f"{self.logging_dic_path}/trj_data/{self.traj_data_file_name}"
+
+    #             time_file_check = os.path.isfile(self.time_data_file)
+    #             traj_file_check = os.path.isfile(self.traj_data_file)
+
+    #             if time_file_check == False and traj_file_check == False:
+    #                 break
+    #             else:
+    #                 interval += 1
+
+    #         print(f"Execution Time Data Path: {self.time_data_file_name}")
+    #         print(f"Trajectoy Data Path: {self.time_data_file_name}")
+           
+    #         self.time_data = open(self.time_data_file, "w", newline="")
+
+    #         self.time_data_writer = csv.writer(self.time_data)
+    #         self.time_data_writer.writerow(["index","time","exe_time"])
+
+    #         self.trajectory = open(self.traj_data_file,'w')
+
+    #     else:
+    #         pass
 
     def update_race_info(self,race_info):
         """
@@ -176,24 +215,26 @@ class ODGPF:
         
         return np.sqrt(dx**2 + dy**2)
 
-    def trajectory_logging(self):
-        _race_time = self.race_time
-        self.trajectory.write(f"{_race_time},")
-        self.trajectory.write(f"{self.current_position[0]},")
-        self.trajectory.write(f"{self.current_position[1]},")
-        self.trajectory.write(f"{self.current_position[2]},")
-        self.trajectory.write(f"{self.current_speed}\n")
+    # def trajectory_logging(self):
+    #     _race_time = self.race_time
+    #     self.traj_data.write(f"{_race_time},")
+    #     self.traj_data.write(f"{self.current_position[0]},")
+    #     self.traj_data.write(f"{self.current_position[1]},")
+    #     self.traj_data.write(f"{self.current_position[2]},")
+    #     self.traj_data.write(f"{self.current_speed}\n")
             
+    # 회전변환행렬
     def transformPoint(self, origin, target):
+
         theta = self.PI/2 - origin[2]
         dx = target[0] - origin[0]
         dy = target[1] - origin[1]
         dtheta = target[2] + theta
-        
         tf_point_x = dx * np.cos(theta) - dy * np.sin(theta)
         tf_point_y = dx * np.sin(theta) + dy * np.cos(theta)
         tf_point_theta = dtheta
         tf_point = [tf_point_x, tf_point_y, tf_point_theta]
+        # print(tf_point)
         
         return tf_point
 
@@ -339,43 +380,51 @@ class ODGPF:
         # print()
 
         return obstacles
+    # 장애물 index, 장애물 하나당 field value, 
 
+    # rep value가 1보다 낮게 계산되면 break, 우측 좌측을 나눠서 장애물이 존재하는 방향부터 계산 시작 
     def rep_field(self, obstacles):
-
-        f_rep_list = [0]*self.scan_range # np.zeros(self.scan_range)
-        for i in range(len(obstacles)):
-            for j in range(self.detect_range_s, self.front_idx):
-                f_rep_list[j] += obstacles[i][2] * np.exp((-0.5)*((((j-self.front_idx)*self.interval - obstacles[i][0]*self.interval)**2) / (obstacles[i][1])**2))
-            
-            for k in range(self.detect_range_e, self.front_idx-1,-1):
-                f_rep_list[k] += obstacles[i][2] * np.exp((-0.5)*((((k-self.front_idx)*self.interval - obstacles[i][0]*self.interval)**2) / (obstacles[i][1])**2))
-
-        self.f_rep_list = f_rep_list
+        # rep_value의 최솟값 제한
         
-        #reversed(f_rep_list)
+        f_rep_list = [0]*self.scan_range # np.zeros(self.scan_range)
+        obs_threshold = 0.1
+        obstacles_num = len(obstacles)
+        # print(obstacles_num)
+        for i in range(obstacles_num):
+            obstacles_center = obstacles[i][0] + self.front_idx
+
+            for j in range(obstacles_center, self.scan_range):
+                rep_value = obstacles[i][2] * np.exp((-0.5)*(((obstacles[i][0]*self.interval - (j-self.front_idx)*self.interval)**2) / (obstacles[i][1])**2))
+                if rep_value <= obs_threshold:
+                    break
+                f_rep_list[j] += (1-self.gamma)*rep_value
+
+            for k in range(obstacles_center-1, -1, -1):
+                # print(obstacles[i][0])
+                rep_value = obstacles[i][2] * np.exp((-0.5)*(((obstacles[i][0]*self.interval - (k-self.front_idx)*self.interval)**2) / (obstacles[i][1])**2))
+                if rep_value <= obs_threshold:
+                    break
+                f_rep_list[k] += (1-self.gamma)*rep_value
+        
+        self.f_rep_list = f_rep_list
         return f_rep_list
 
-    def att_field(self, goal_point):
+    def att_field(self, goal_point, f_rep_list):
 
         f_att_list = []
+        f_total_list = [0]*self.scan_range
         for i in range(self.scan_range):
             idx2deg = (-self.front_idx+i)*self.interval
             f_att = self.gamma * np.fabs(goal_point[1] - idx2deg)
             f_att_list.append(f_att)
 
-        return f_att_list 
-
-    def total_field(self, f_rep_list, f_att_list):
+            f_total_list[i] = f_att + f_rep_list[i]
         
-        f_total_list = [0]*self.scan_range
-
-        for i in range(self.scan_range):
-            f_total_list[i] = f_rep_list[i] + f_att_list[i]
-
         self.min_idx = np.argmin(f_total_list[self.detect_range_s:self.detect_range_e])+self.detect_range_s
-
+        
         self.f_total_list = f_total_list
-        return self.min_idx
+
+        return f_att_list, self.min_idx
 
     def angle(self, f_total_list):
 
@@ -438,6 +487,7 @@ class ODGPF:
         self.ackermann_data.drive.steering_angle = steering_angle   
         self.ackermann_data.drive.steering_angle_velocity = 0   
         self.ackermann_data.drive.speed = self.set_speed
+        # print(self.set_speed)
         self.ackermann_data.drive.acceleration = 0
         self.ackermann_data.drive.jerk = 0
      
@@ -463,16 +513,19 @@ class ODGPF:
         qz = odom_msg.pose.pose.orientation.z
         qw = odom_msg.pose.pose.orientation.w 
 
+        # print( "qx",qx, "qy",qy , "qz",qz , "qw",qw)
         siny_cosp = 2.0 * (qw*qz + qx*qy)
         cosy_cosp = 1.0-2.0*(qy*qy + qz*qz)
 
         current_position_theta = np.arctan2(siny_cosp, cosy_cosp)
         current_position_x = odom_msg.pose.pose.position.x
         current_position_y = odom_msg.pose.pose.position.y
-        # print(current_position_theta)
+        # print(current_position_x,current_position_theta)
+        # print("theta" , current_position_theta)
         self.current_position = [current_position_x,current_position_y, current_position_theta]
 
         self.find_desired_wp()
+        # print(self.wp_index_current)
         _speed = odom_msg.twist.twist.linear.x
         _steer = odom_msg.twist.twist.angular.z
         self.current_speed = _speed
@@ -559,7 +612,6 @@ class ODGPF:
         i = 0
         while not rospy.is_shutdown():
             i += 1
-
             if self.scan_range == 0: continue
             tn0 = time.time()
             loop += 1
@@ -567,8 +619,8 @@ class ODGPF:
             obstacles = self.define_obstacles(self.scan_filtered)
 
             rep_list = self.rep_field(obstacles)
-            att_list = self.att_field(self.desired_wp_rt)
-            total_list = self.total_field(rep_list, att_list)
+            att_list, total_list = self.att_field(self.desired_wp_rt, rep_list)
+            # total_list = self.total_field(rep_list, att_list)
 
             desired_angle = total_list#self.angle(total_list)
             self.main_drive(desired_angle)
@@ -579,12 +631,22 @@ class ODGPF:
                 tn0: driving loop start Time
                 tn1: driving loop final Time
             """
+            len_obs = len(obstacles)
             
-            if self.logger_trigger:
-                self.time_data_writer.writerow([loop, tn1-tn, tn1-tn0])
-                self.trajectory_logging()
+            if self.exec_trigger:
+                self.time_data_writer.writerow([loop, tn1-tn, tn1-tn0, len_obs])
                 
-            if i % 10 == 0:
+
+            if self.traj_trigger:
+
+                _race_time = self.race_time
+                self.traj_data.write(f"{_race_time},")
+                self.traj_data.write(f"{self.current_position[0]},")
+                self.traj_data.write(f"{self.current_position[1]},")
+                self.traj_data.write(f"{self.current_position[2]},")
+                self.traj_data.write(f"{self.current_speed}\n")
+                
+            if i % 3 == 0:
                 # del self.s1[0]
                 # del self.s2[0]
                 # del self.s3[0]
@@ -607,7 +669,7 @@ class ODGPF:
                 self.c2 = self.c2 + att_list[self.detect_range_s:self.detect_range_e][::-1]
                 self.c3 = self.c3 + rep_list[self.detect_range_s:self.detect_range_e][::-1]
 
-                # # ####################
+                # # # ####################
                 # plt.subplot(1,1,1)
                 # plt.plot(self.c,self.c1,color = 'black', label ='total field',linewidth=3.0)
                 # plt.xticks([self.detect_range*0,self.detect_range*1,self.detect_range*2,self.detect_range*3,self.detect_range*4,self.detect_range*self.detect_n])
@@ -623,26 +685,44 @@ class ODGPF:
                 # plt.grid()
 
                 # #plt.subplot(1,1,1)
-                # plt.plot(self.c,self.c3,color = 'r',label ='rep field',linewidth=3.0)
-                # plt.legend(bbox_to_anchor=(1,1))
+                plt.plot(self.c,self.c3,color = 'r',label ='rep field',linewidth=3.0)
+                plt.legend(bbox_to_anchor=(1,1))
+                plt.xticks([self.detect_range*0,self.detect_range*1])
                 # plt.xticks([self.detect_range*0,self.detect_range*1,self.detect_range*2,self.detect_range*3,self.detect_range*4,self.detect_range*self.detect_n])
-                # # plt.ylim([0, 5])
-                # plt.grid()
-                # plt.pause(0.001)
-                # plt.clf()
+                # plt.ylim([0, 5])
+                plt.grid()
+                plt.pause(0.001)
+                plt.clf()
                 # print(self.steering_angle_past)
-                # # ##################
+                # # # ##################
    
         
             rate.sleep()
 
-        if self.logger_trigger:
-            print(self.race_time, self.race_info.ego_collision)
+        # if self.logger_trigger:
+        #     print(self.race_time, self.race_info.ego_collision)
 
-            self.recording.write(f"race_time : {np.round(self.race_time,4),self.race_info.ego_collision}\n")
+        #     self.recording.write(f"race_time : {np.round(self.race_time,4),self.race_info.ego_collision}\n")
 
-            self.trajectory.close()
+        #     self.trajectory.close()
 
+"""
+           # 장애물이 우측에 존재
+            if obstacles[i][4] < self.front_idx:
+                for j in range(obstacles[i][3],obstacles[i][4]):#(self.detect_range_s, self.front_idx):   
+                    f_rep_list[j] += obstacles[i][2] * np.exp((-0.5)*((((j-self.front_idx)*self.interval - obstacles[i][0]*self.interval)**2) / (obstacles[i][1])**2))
+            # 장애물이 좌측에 존재
+            elif obstacles[i][3] > self.front_idx:
+                for j in range(obstacles[i][3],obstacles[i][4]-1,-1):#(self.detect_range_s, self.front_idx):   
+                    f_rep_list[j] += obstacles[i][2] * np.exp((-0.5)*((((j-self.front_idx)*self.interval - obstacles[i][0]*self.interval)**2) / (obstacles[i][1])**2))
+            # 장애물이 정면에 걸쳐서 존재
+            else:
+                for j in range(obstacles[i][3], self.front_idx):   
+                    f_rep_list[j] += obstacles[i][2] * np.exp((-0.5)*((((j-self.front_idx)*self.interval - obstacles[i][0]*self.interval)**2) / (obstacles[i][1])**2))
+                
+                for k in range(obstacles[i][4], self.front_idx-1,-1):
+                    f_rep_list[k] += obstacles[i][2] * np.exp((-0.5)*((((k-self.front_idx)*self.interval - obstacles[i][0]*self.interval)**2) / (obstacles[i][1])**2))
+"""
 if __name__ == '__main__':
     rospy.init_node("driver_odg_pf")
     A = ODGPF()
